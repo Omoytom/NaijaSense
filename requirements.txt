@@ -1,0 +1,12 @@
+datasets>=2.13.0,<3.0.0          # Legacy Hugging Face datasets required for script-based dataset loading
+pandas>=2.2.0            # High-performance data structure and manipulation engine
+tqdm>=4.66.0             # Visual progress tracking bars for long data streams
+
+openai>=2.37.0           # Official client to interface with gpt-4o-mini
+google-genai>=0.1.1      # Official modern SDK for Gemini 1.5 models
+pydantic>=2.13.4         # Essential for strict structured JSON output mapping and validation
+
+streamlit>=1.57.0        # Rapid UI generation engine 
+fastapi>=0.136.1         # High-speed web framework for production-grade API endpoints
+uvicorn>=0.30.0          # ASGI server implementation to host and run the FastAPI app
+python-dotenv>=1.0.1     # Safe environment variable extraction (e.g., OPENAI_API_KEY)
