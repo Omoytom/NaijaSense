@@ -27,8 +27,23 @@ class RecommendedItem(BaseModel):
     category: str
     curation_justification: str  # Culturally contextual reason for this pick
 
-class ReActRecommendationOutput(BaseModel):
-    """Head 3: ReAct Reason-Before-Recommend Output Structure"""
-    thought_process: str         # The agent's raw internal psychological deduction
-    selected_action: str         # The filtering heuristic chosen by the agent
-    recommendations: List[RecommendedItem]
+class MultiAgentArbitrationOutput(BaseModel):
+    """Head 3: Multi-Agent Cognitive Arbitration Output Structure"""
+    infrastructure_realist_critique: str  # Agent A: Grid, thermal, and mechanical durability focus
+    value_budget_hawk_critique: str       # Agent B: Cost-to-utility scaling and lifespan verification
+    technical_visionary_critique: str     # Agent C: Spec future-proofing and ecosystem alignment
+    arbitrator_synthesis: str             # The final resolution resolving agent trade-offs
+    recommendations: List[RecommendedItem] # The targeted top recommendations
+
+class ReviewGenerationRequest(BaseModel):
+    """Input contract for the Task A review simulation endpoint"""
+    user_id: str
+    product_title: str
+    category: str
+    additional_context: str = ""
+
+class RecommendationRequest(BaseModel):
+    """Input contract for the Task B intelligent recommendation endpoint"""
+    user_id: str
+    context_signal: str
+    target_category: str

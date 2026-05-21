@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 import random
 import pandas as pd
@@ -7,10 +8,15 @@ from google import genai
 from google.genai import types
 from google.genai.errors import APIError
 from dotenv import load_dotenv
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from src.core.schemas import CriticOutput, VoiceOutput, UnifiedSimulationResult
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 client = genai.Client()
 
 STAGING_PATH = "data/staging_dataset.json"
@@ -97,12 +103,12 @@ def run_dual_head_simulation(user_id: str, product_title: str, category: str, ad
     Analyze the user's grading strictness or leniency from history. Output a calibrated predicted rating.
     """
     
-    print("📈 Running Head 1: Calibrating User Rating Scale...")
+    print(" Running Head 1: Calibrating User Rating Scale...")
     critic_res = execute_with_retry(critic_prompt, critic_system_prompt, CriticOutput)
 
-    # ==========================================
+    
     # HEAD 2: THE VOICE (Nigerian Behavioral Localizer)
-    # ==========================================
+    
     voice_system_prompt = (
         "You are a human behavioral simulation agent specializing in localized linguistic modeling.\n\n"
         "CRUCIAL TASK SPECIFICATIONS:\n"
@@ -140,7 +146,7 @@ def run_dual_head_simulation(user_id: str, product_title: str, category: str, ad
 
 if __name__ == "__main__":
     # Test execution using a valid user profile from your dataset
-    test_user = "A100WO06OQR8BQ" 
+    test_user = "AFKZENTNBQ7A7V7UXW5JJI6UGRYQ" 
     test_title = "Heavy Duty 3000W Automatic Voltage Regulator / Stabilizer"
     
     print(" Testing Gemini-Powered Dual-Head Simulation Core...")
@@ -151,7 +157,7 @@ if __name__ == "__main__":
             category="Electronics",
             additional_context="Handles extreme electrical spikes, rugged casing."
         )
-        print(f"\n✨ Predicted Rating: {result.predicted_rating}/5.0")
+        print(f"\n Predicted Rating: {result.predicted_rating}/5.0")
         print(f" Critic Reasoning: {result.critic_reasoning}")
         print(f"🇳🇬 Generated Localized Review:\n\"{result.generated_review}\"")
         print(f" Cultural Alignment Insights: {result.cultural_notes}")

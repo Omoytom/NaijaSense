@@ -11,7 +11,7 @@ if project_root not in sys.path:
 
 # Import your validated AI/ML engines from Phase 1
 from src.agents.user_modelling import run_dual_head_simulation
-from src.agents.recommender import run_react_recommender
+from src.agents.recommender import run_multi_agent_recommender
 
 # 1. Global Page Layout & Theme Configuration
 st.set_page_config(
@@ -44,7 +44,7 @@ def load_cached_profiles():
 df = load_cached_profiles()
 
 if df.empty:
-    st.error("⚠️ Local staging data asset missing! Please run 'python -m src.utils.data_loader' first.")
+    st.error(" Local staging data asset missing! Please run 'python -m src.utils.data_loader' first.")
 else:
     # 3. Sidebar Profile Navigation
     st.sidebar.header("👤 User Persona Registry")
@@ -58,7 +58,7 @@ else:
     st.sidebar.metric("Historical Review Count", len(user_history_df))
     
     # Collapsible viewport to inspect raw context constraints
-    with st.sidebar.expander("🔍 View Profile History Logs", expanded=False):
+    with st.sidebar.expander(" View Profile History Logs", expanded=False):
         st.dataframe(
             user_history_df[["domain_category", "rating", "product_title"]],
             hide_index=True
@@ -148,7 +148,7 @@ else:
                 with st.spinner("Analyzing profile patterns and testing candidate shelf space..."):
                     try:
                         # Direct execution call to David's verified ReAct recommender
-                        rec_res = run_react_recommender(
+                        rec_res = run_multi_agent_recommender(
                             user_id=selected_user_id,
                             context_signal=context_signal,
                             target_category=rec_category
