@@ -1,52 +1,26 @@
-import json
 import os
-import sys
 import time
 import random
+import json
 import pandas as pd
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
 from dotenv import load_dotenv
+from src.core.schemas import CriticOutput, VoiceOutput, UnifiedSimulationResult, ReviewGenerationRequest
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-from src.core.schemas import CriticOutput, VoiceOutput, UnifiedSimulationResult
-
-# Load environment variables
+# Force override to clear out stale terminal session caches
 load_dotenv(override=True)
-client = genai.Client()
+api_key_token = os.getenv("GEMINI_API_KEY")
+client = genai.Client(api_key=api_key_token)
 
 STAGING_PATH = "data/staging_dataset.json"
-# Upgrading to the new 3.5 model for better agentic throughput and fresher capacity
-MODEL_NAME = 'gemini-3.5-flash' 
+REGISTRY_PATH = "data/user_registry.json"
+MODEL_NAME = 'gemini-3.5-flash'
 
-def get_user_history(user_id: str) -> str:
-    """Extracts and stringifies past reviews of a user to construct context."""
-    if not os.path.exists(STAGING_PATH):
-        raise FileNotFoundError("Run data loader pipeline first to generate staging_dataset.json")
-        
-    df = pd.read_json(STAGING_PATH)
-    user_records = df[df["user_id"] == user_id]
-    
-    if user_records.empty:
-        return ""
-        
-    context_lines = []
-    for _, row in user_records.iterrows():
-        context_lines.append(
-            f"- [{row['domain_category']}] Item: {row['product_title']} | "
-            f"Given Rating: {row['rating']}/5 | Review: {row['review_text']}"
-        )
-    return "\n".join(context_lines)
-
-def execute_with_retry(prompt: str, system_instruction: str, response_schema: type, max_retries: int = 5, base_delay: float = 2.0):
-    """
-    Executes a Gemini API generation request with randomized exponential backoff
-    to gracefully handle 503 (Unavailable) and 429 (Rate Limit) server events.
-    """
+def execute_with_retry(prompt: str, system_instruction: str, response_schema: type, max_retries: int = 5):
+    """Autonomous exponential backoff middleware with jitter protecting free-tier capacity."""
+    base_delay = 2.0
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
@@ -56,110 +30,145 @@ def execute_with_retry(prompt: str, system_instruction: str, response_schema: ty
                     system_instruction=system_instruction,
                     response_mime_type="application/json",
                     response_schema=response_schema,
-                    temperature=0.7 if response_schema == VoiceOutput else 0.1,
-                ),
+                    temperature=0.2
+                )
             )
-            # Successfully got a response, validate and return
-            return response_schema.model_validate_json(response.text)
-            
-        except APIError as e:
-            # Trap 503 (Service Unavailable) or 429 (Rate Limits)
-            if e.code in [503, 429] and attempt < max_retries - 1:
-                # Calculate sleep time: base_delay * (2^attempt) + random jitter
-                sleep_time = (base_delay * (2 ** attempt)) + random.uniform(0.5, 1.5)
-                print(f"⚠️ Server busy ({e.code}). Retrying in {sleep_time:.2f} seconds (Attempt {attempt + 1}/{max_retries})...")
-                time.sleep(sleep_time)
-            else:
-                # Raise immediately if it's a critical structural error (like 400 Bad Request)
-                raise e
-    raise APIError("Failed to get response from Gemini API after maximum retries due to server saturation.")
+            return response.parsed
+        except APIError as api_err:
+            if api_err.code == 429 and attempt < max_retries - 1:
+                sleep_duration = (base_delay ** attempt) + random.uniform(0.5, 1.5)
+                print(f"⚠️ Server busy (429). Retrying in {sleep_duration:.2f} seconds...")
+                time.sleep(sleep_duration)
+                continue
+            raise api_err
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(base_delay ** attempt)
+                continue
+            raise e
 
-def run_dual_head_simulation(user_id: str, product_title: str, category: str, additional_context: str = "") -> UnifiedSimulationResult:
-    """Orchestrates Head 1 (The Critic) and Head 2 (The Voice) safely with retries."""
-    
-    # 1. Gather historical baseline
-    history_context = get_user_history(user_id)
-    if not history_context:
-        history_context = "No previous history found (Cold-start persona baseline initialization)."
+def get_user_history(user_id: str) -> str:
+    """
+    Extracts real historical text reviews from the staging database 
+    cache to feed active transaction patterns into the prompt context window.
+    """
+    if user_id == "None" or not os.path.exists(STAGING_PATH):
+        return ""
+    try:
+        df = pd.read_json(STAGING_PATH)
+        user_data = df[df["user_id"] == user_id].sort_values(by="timestamp", ascending=False).head(3)
+        if user_data.empty:
+            return ""
+        
+        history_blocks = []
+        for _, row in user_data.iterrows():
+            history_blocks.append(
+                f"-[Category: {row.get('domain_category')}] "
+                f"Item: {row.get('product_title')} | "
+                f"Rating Given: {row.get('rating')}/5\n"
+                f"Review Text: {row.get('review_text')}"
+            )
+        return "\n\n".join(history_blocks)
+    except Exception as e:
+        print(f"⚠️ Error reading historical text trace patterns: {e}")
+        return ""
 
-    # ==========================================
-    # HEAD 1: THE CRITIC (Rating Calibration)
-    # ==========================================
-    critic_system_prompt = (
-        "You are an analytical data engine tracking human grading consistency. "
-        "Your sole task is to predict the numerical rating (1.0 to 5.0) a user would assign "
-        "to a new product based on their explicit historical review patterns and tendencies."
+def infer_nigerian_environmental_context(age: int, interests: list) -> tuple:
+    """
+    Zero-Shot Context Generation: Deduces a realistic demographic profile and 
+    generalized infrastructure reality based purely on age and interests.
+    """
+    system_prompt = (
+        "You are an expert sociologist and infrastructural analyst tracking contemporary Nigerian life.\n"
+        "Your job is to generate highly accurate background contexts for user profiles based on age and interests."
     )
     
-    critic_prompt = f"""
-    [USER HISTORY]
-    {history_context}
+    prompt = f"""
+    Generate a realistic background profile for a person living in Nigeria with these attributes:
+    - Age: {age}
+    - Stated Core Interests: {', '.join(interests)}
     
-    [NEW TARGET PRODUCT]
-    Category: {category}
-    Title: {product_title}
-    Context: {additional_context}
+    Deduce two specific items:
+    1. DEMOGRAPHIC COHORT SUMMARY: Where do they likely live or work/study? What is their current life path?
+    2. OPERATIONAL INFRASTRUCTURE REALITY: What is their daily electrical and digital setup? Do they rely on grid power, fuel generators, solar inverters, or mobile data caps? Keep this grounded in everyday Nigerian context.
     
-    Analyze the user's grading strictness or leniency from history. Output a calibrated predicted rating.
+    Return your response as a raw JSON object matching this structure exactly:
+    {{
+        "demographic": "Brief description sentence",
+        "infrastructure": "Brief infrastructure reality sentence"
+    }}
     """
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                temperature=0.3
+            )
+        )
+        parsed_data = json.loads(response.text)
+        return parsed_data.get("demographic", ""), parsed_data.get("infrastructure", "")
+    except Exception:
+        return "Urban professional/student community member", "Standard urban grid connection with alternative generator backup profiles"
+
+def run_dynamic_user_simulation(payload: ReviewGenerationRequest) -> UnifiedSimulationResult:
+    """Orchestrates Head 1 and Head 2 concurrently using inferred or cached profile constants."""
+    user = payload.user_context
     
-    print(" Running Head 1: Calibrating User Rating Scale...")
+    # Gateway routing matrix paths
+    if user.selected_id == "None":
+        inferred_demo, inferred_infra = infer_nigerian_environmental_context(user.age, user.interests)
+        routing_diagnostic = "Cold-Start Workspace Matrix: Background contexts dynamically generated via inference engine."
+    else:
+        if os.path.exists(REGISTRY_PATH):
+            with open(REGISTRY_PATH, "r") as f:
+                reg = json.load(f)
+            cached = reg.get(user.selected_id, {})
+            inferred_demo = cached.get("extracted_behavioral_persona", "Verified historical user profile patterns")
+            inferred_infra = "Sourced via direct dataset row correlation attributes"
+        else:
+            inferred_demo = "Verified historical user profile patterns"
+            inferred_infra = "Standard direct dataset trace parameters"
+        routing_diagnostic = f"Direct Identity Link Active. Sourcing actual history for User ID: [{user.selected_id}]"
+
+    # Pull the real historical reviews from text blocks
+    historical_footprint = get_user_history(user.selected_id)
+
+    persona_context = f"""
+    [ACTIVE PROFILE CORE]
+    - Name: {user.name} | Age: {user.age}
+    - Domains of Interest: {', '.join(user.interests)}
+    - Assumed Socio-Economic Cohort: {inferred_demo}
+    - Local Infrastructure Realities: {inferred_infra}
+    
+    [PIPELINE TRACE DIAGNOSTIC]: {routing_diagnostic}
+    """
+    if historical_footprint:
+        persona_context += f"\n\n[VERIFIED ANCHOR HISTORICAL TRANSACTIONS]\n{historical_footprint}"
+
+    # --- Head 1: The Critic ---
+    critic_system_prompt = "Calculate the strict numerical star rating (1.0 to 5.0) this persona profile would assign to the item."
+    critic_prompt = f"User Context:\n{persona_context}\n\nEvaluate specifications:\nTitle: {payload.product_title}\nSpecs: {payload.product_specifications}"
     critic_res = execute_with_retry(critic_prompt, critic_system_prompt, CriticOutput)
 
-    
-    # HEAD 2: THE VOICE (Nigerian Behavioral Localizer)
-    
+    # --- Head 2: The Voice ---
     voice_system_prompt = (
-        "You are a human behavioral simulation agent specializing in localized linguistic modeling.\n\n"
-        "CRUCIAL TASK SPECIFICATIONS:\n"
-        "1. BEHAVIORAL FIDELITY: You must write a consumer review from the standpoint of a Nigerian buyer.\n"
-        "2. VALUE MATRICES: Nigerian consumers assess value-for-money heavily based on physical durability, "
-        "cost-effectiveness, and infrastructure constraints (e.g., resilience against erratic power, heat, battery life).\n"
-        "3. LINGUISTIC BLENDING: Seamlessly blend formal Nigerian English with natural local phrasing "
-        "(e.g., expressions like 'abeg', 'no cap', 'No yawa', 'It makes sense die', 'it gave what it was supposed to give', or sharp structural sarcasm if performance fails).\n"
-        "4. CONSTRAINT ENFORCEMENT: The review tone MUST perfectly match the rating provided by the Critic."
+        "Write a first-person localized consumer review matching the provided persona profile details.\n"
+        "Ensure your linguistic tone heavily matches their age criteria (youth slang vs corporate/formal Nigerian expressions words such as 'abi' or 'biko' or 'No yawa' ).\n"
+        "The review context details must completely support an evaluation score of exactly " f"{critic_res.predicted_rating}/5."
     )
-    
-    voice_prompt = f"""
-    [USER HISTORY]
-    {history_context}
-    
-    [TARGET ITEM]
-    Product: {product_title} ({category})
-    
-    [CRITIC MANDATE CONSTRAINT]
-    You MUST simulate an experience that warrants exactly a {critic_res.predicted_rating}/5 rating.
-    """
-    
-    print("🇳🇬 Running Head 2: Simulating Localized Behavioral Voice...")
+    voice_prompt = f"User Profile Matrix:\n{persona_context}\nTarget Title: {payload.product_title}\nEnforce Numerical Rating Constraint: {critic_res.predicted_rating}"
     voice_res = execute_with_retry(voice_prompt, voice_system_prompt, VoiceOutput)
 
-    # Combine both heads into the final unified object
     return UnifiedSimulationResult(
-        user_id=user_id,
-        product_title=product_title,
+        user_id=user.selected_id if user.selected_id != "None" else "Inferred_Sandbox_User",
+        product_title=payload.product_title,
         predicted_rating=critic_res.predicted_rating,
         critic_reasoning=critic_res.rating_justification,
         generated_review=voice_res.generated_review,
-        cultural_notes=voice_res.cultural_nuance_notes
+        cultural_notes=voice_res.cultural_nuance_notes,
+        inferred_demographic=inferred_demo,
+        inferred_infrastructure=inferred_infra
     )
-
-if __name__ == "__main__":
-    # Test execution using a valid user profile from your dataset
-    test_user = "AFKZENTNBQ7A7V7UXW5JJI6UGRYQ" 
-    test_title = "Heavy Duty 3000W Automatic Voltage Regulator / Stabilizer"
-    
-    print(" Testing Gemini-Powered Dual-Head Simulation Core...")
-    try:
-        result = run_dual_head_simulation(
-            user_id=test_user,
-            product_title=test_title,
-            category="Electronics",
-            additional_context="Handles extreme electrical spikes, rugged casing."
-        )
-        print(f"\n Predicted Rating: {result.predicted_rating}/5.0")
-        print(f" Critic Reasoning: {result.critic_reasoning}")
-        print(f"🇳🇬 Generated Localized Review:\n\"{result.generated_review}\"")
-        print(f" Cultural Alignment Insights: {result.cultural_notes}")
-    except Exception as e:
-        print(f"\n Execution stopped: {e}")

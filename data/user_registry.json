@@ -1,0 +1,35 @@
+{
+    "AFWVN52MRBWOTIK7UGXBWGOY4HBA": {
+        "extracted_behavioral_persona": "This reviewer demonstrates an objective and somewhat forgiving grading temperament, awarding three stars even to physically flawed books while reserving four stars for highly engaging narratives. They focus on strong character development, realistic plot dynamics, emotional impact, and a book's potential for group discussion, alongside basic physical readability. Their core irritants include poor print formatting (such as tiny, faint text), frustratingly unrealistic character behaviors, and unmet expectations regarding character presence.",
+        "total_historical_reviews_count": 2792,
+        "preferred_domains": [
+            "Books",
+            "Electronics"
+        ]
+    },
+    "AGWIU2DVVALEVN4DNKJ5CIBFU4JQ": {
+        "extracted_behavioral_persona": "This user exhibits a highly forgiving grading temperament, frequently awarding maximum ratings even while pointing out narrative inconsistencies, unresolved character fates, or unwanted dark tones. They focus heavily on thematic realism, immersive storytelling, and characters who use practical intelligence, often drawing direct parallels between the film's events and real-world issues like technology failures. Consequently, their core irritants are nonsensical plot holes, illogical character behaviors, and unrealistic depictions of technology that defy common sense.",
+        "total_historical_reviews_count": 1361,
+        "preferred_domains": [
+            "Movies"
+        ]
+    },
+    "AGZZXSMMS4WRHHJRBUJZI4FZDHKQ": {
+        "extracted_behavioral_persona": "The user exhibits a highly forgiving and enthusiastic grading temperament, consistently awarding five-star ratings to books that successfully engage children or offer practical utility. Their quality focus centers on physical durability (\"well made\"), clear and accessible content, and vibrant, appealing aesthetics like colorful illustrations. Consequently, their core irritants likely include poor physical construction, overly complex layouts, and products that fail to keep children actively engaged away from screens.",
+        "total_historical_reviews_count": 1197,
+        "preferred_domains": [
+            "Books",
+            "Electronics",
+            "Movies"
+        ]
+    },
+    "AFDNLNTANUGENK62RSTAQALJOWPQ": {
+        "extracted_behavioral_persona": "This reviewer exhibits a highly appreciative yet objective grading temperament, consistently awarding high ratings to well-crafted books that meet their standards. Their quality focus centers on extensive research, intellectual depth, smooth narrative flow, and strong emotional resonance with relatable characters. Consequently, their core irritants are superficiality, a lack of detailed historical depth, and writing that fails to engage the reader intellectually or emotionally.",
+        "total_historical_reviews_count": 905,
+        "preferred_domains": [
+            "Books",
+            "Electronics",
+            "Movies"
+        ]
+    }
+}

@@ -1,102 +1,114 @@
+import os
+import sys
+import pandas as pd
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-# Import your strict input/output verification schemas
+# Enforce project root discovery inside ASGI web server application processes
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+# Import schemas and registry utilities explicitly
 from src.core.schemas import (
     ReviewGenerationRequest, 
-    UnifiedSimulationResult,
+    UnifiedSimulationResult, 
     RecommendationRequest, 
-    MultiAgentArbitrationOutput,
+    MultiAgentArbitrationOutput
 )
+from src.core.registry import get_or_create_user_registry
 
-from src.agents.user_modelling import run_dual_head_simulation
-from src.agents.recommender import run_multi_agent_recommender
+# Aligned imports tracking the singular spelling convention
+from src.agents.user_modelling import run_dynamic_user_simulation
+from src.agents.recommender import run_dynamic_multi_agent_recommender
 
-# 1. Initialize the Enterprise API Engine
 app = FastAPI(
-    title="🇳🇬 NaijaSense Cognitive API Engine",
-    description="Production API endpoints providing culturally localized user-modeling and agentic recommendation logic.",
-    version="1.0.0"
+    title="🇳🇬 NaijaSense Cognitive API Engine", 
+    description="Production ASGI server routing layer handling dynamic lookalike clustering and zero-shot context inference dashboards.",
+    version="3.0.0"
 )
 
-# 2. Configure Cross-Origin Resource Sharing (CORS) Guardrails
-# This allows external applications (like Streamlit, React, or the judge's testing tools) to safely bind to the endpoints
+# Enable robust cross-origin sharing configurations to protect decoupled deployment sockets
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permits access from any origin infrastructure during the hackathon sprint
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all standard HTTP actions (GET, POST, OPTIONS, etc.)
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/", status_code=status.HTTP_200_OK)
-def read_root():
-    """Health check endpoint to verify system uptime and routing integrity."""
-    return {
-        "status": "healthy",
-        "framework": "FastAPI",
-        "engine": "NaijaSense (DNPE) v1.0.0",
-        "documentation_path": "/docs"
-    }
+STAGING_PATH = "data/staging_dataset.json"
 
+@app.get("/api/v1/dataset-users", status_code=status.HTTP_200_OK)
+def get_dataset_users():
+    """
+    Identity Sync Endpoint: Exposes the text-extracted historical reviewer keys 
+    to the client dropdown panel, ensuring strict state synchronization.
+    """
+    try:
+        user_registry = get_or_create_user_registry()
+        return {"user_ids": list(user_registry.keys())}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract identity registry matrix maps: {str(e)}"
+        )
 
-#  ENDPOINT FOR TASK A: USER MODELING & SIMULATION
-@app.post(
-    "/api/v1/generate-review", 
-    response_model=UnifiedSimulationResult,
-    status_code=status.HTTP_200_OK,
-    summary="Simulate user grading scale and written text reviews"
-)
+@app.get("/api/v1/random-product/{category}", status_code=status.HTTP_200_OK)
+def get_random_product_by_category(category: str):
+    """
+    Dynamic Segment Sampler: Extracts a single real product row from the targeted 
+    domain category slice to instantly populate the interactive sandbox workbench.
+    """
+    try:
+        if not os.path.exists(STAGING_PATH):
+            return {
+                "product_title": f"Standard Premium {category} Asset Node",
+                "specifications": "Standard baseline data sheet profile parameters configuration."
+            }
+            
+        df = pd.read_json(STAGING_PATH)
+        # Isolate rows matching the specific category query criteria
+        filtered_df = df[df["domain_category"].str.lower() == category.lower()]
+        
+        if filtered_df.empty:
+            filtered_df = df # Graceful fallback tracking arrays if category matches are sparse
+            
+        sampled_row = filtered_df.sample(n=1).iloc[0]
+        return {
+            "product_title": sampled_row.get("product_title", "Premium Retail Asset"),
+            "specifications": f"Item ASIN: {sampled_row.get('item_id')}. Context footprints: {sampled_row.get('review_text', '')[:200]}"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Data sampler execution array trace fault: {str(e)}"
+        )
+
+@app.post("/api/v1/generate-review", response_model=UnifiedSimulationResult)
 async def generate_user_review(payload: ReviewGenerationRequest):
     """
-    Triggers the Dual-Head architecture:
-    - Head 1 (The Critic) predicts a mathematically calibrated star rating.
-    - Head 2 (The Voice) applies a localized Nigerian market persona to express the critique textually.
+    Task A Execution Node: Intercepts onboarding parameters, infers local background variables 
+    autonomously, and executes the Dual-Head constraint simulation loop.
     """
     try:
-        # Pass request payload fields cleanly into your core modeling script
-        result = run_dual_head_simulation(
-            user_id=payload.user_id,
-            product_title=payload.product_title,
-            category=payload.category,
-            additional_context=payload.additional_context
-        )
-        return result
-    except FileNotFoundError as fnf:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(fnf))
+        return run_dynamic_user_simulation(payload)
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail=f"Cognitive Engine simulation fault: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Task A cognitive simulation processing matrix failure: {str(e)}"
         )
 
-# ========================================================
-#  ENDPOINT FOR TASK B: INTELLIGENT RECOMMENDATION
-# ========================================================
-@app.post(
-    "/api/v1/recommend", 
-    response_model=MultiAgentArbitrationOutput,
-    status_code=status.HTTP_200_OK,
-    summary="Execute Reason-Before-Recommend cross-domain pipeline"
-)
+@app.post("/api/v1/recommend", response_model=MultiAgentArbitrationOutput)
 async def recommend_items(payload: RecommendationRequest):
     """
-    Triggers a stateful ReAct loop that processes cross-domain transaction footprints,
-    formulates explicit hypotheses regarding environmental constraints, logs filtering actions,
-    and returns a curated list of personalized recommendations.
+    Task B Execution Node: Builds an intent-routed candidate shelf using pandas feature weights, 
+    and passes it directly down to convene the specialized multi-agent debate panels.
     """
     try:
-        # Pass request payload fields cleanly into your core recommender script
-        recommendations = run_multi_agent_recommender(
-            user_id=payload.user_id,
-            context_signal=payload.context_signal,
-            target_category=payload.target_category
-        )
-        return recommendations
-    except FileNotFoundError as fnf:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(fnf))
+        return run_dynamic_multi_agent_recommender(payload)
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail=f"Agentic Recommender loop fault: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Task B multi-agent arbitration execution matrix failure: {str(e)}"
         )

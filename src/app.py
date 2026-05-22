@@ -1,174 +1,200 @@
 import os
 import sys
 import json
-import pandas as pd
 import streamlit as st
+import pandas as pd
 
-# Ensure the project root is on sys.path when Streamlit runs this script.
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-# Import your validated AI/ML engines from Phase 1
-from src.agents.user_modelling import run_dual_head_simulation
-from src.agents.recommender import run_multi_agent_recommender
+from src.core.schemas import UserContextInput, ReviewGenerationRequest, RecommendationRequest
+from src.agents.user_modelling import run_dynamic_user_simulation
+from src.agents.recommender import run_dynamic_multi_agent_recommender
+from src.core.registry import get_or_create_user_registry
 
-# 1. Global Page Layout & Theme Configuration
-st.set_page_config(
-    page_title="NaijaSense Cognitive Engine", 
-    page_icon="🚀", 
-    layout="wide"
-)
+st.set_page_config(page_title="NaijaSense Framework Studio", layout="wide", page_icon="🇳🇬")
+st.title("🇳🇬 NaijaSense: Monolithic Diagnostic Studio")
+st.caption("Direct Core Pipeline Integration - Local Data Execution Matrix")
 
-# Custom styling to give it an elite corporate feel
-st.markdown("""
-    <style>
-    .block-container {padding-top: 2rem; padding-bottom: 2rem;}
-    .stTabs [data-baseweb="tab"] {font-size: 1.1rem; font-weight: 600;}
-    </style>
-""", unsafe_allow_html=True)
-
-st.title(" NaijaSense: Agentic Personalization & Recommendation Engine")
-st.caption("A culturally intelligent, context-sensitive reasoning framework tailored for the Bluechip Tech AI Challenge.")
-st.markdown("---")
-
-# 2. Optimized Local Data Asset Caching
 STAGING_PATH = "data/staging_dataset.json"
+REGISTRY_PATH = "data/user_registry.json"
 
-@st.cache_data
-def load_cached_profiles():
-    if not os.path.exists(STAGING_PATH):
-        return pd.DataFrame()
-    return pd.read_json(STAGING_PATH)
+# Load the real behavioral registry mapping file
+user_registry = get_or_create_user_registry()
+user_id_pool = ["None"] + list(user_registry.keys())
 
-df = load_cached_profiles()
+# ==========================================
+# SIDEBAR RECONSTRUCTION CONTROL PANEL
+# ==========================================
+# Open src/app.py and replace the complete 'with st.sidebar:' section with this block:
 
-if df.empty:
-    st.error(" Local staging data asset missing! Please run 'python -m src.utils.data_loader' first.")
-else:
-    # 3. Sidebar Profile Navigation
-    st.sidebar.header("👤 User Persona Registry")
-    unique_user_ids = df["user_id"].unique()
-    selected_user_id = st.sidebar.selectbox("Select Target User ID:", unique_user_ids)
+with st.sidebar:
+    st.header("👤 Personalization Control Matrix")
+    st.markdown("---")
     
-    # Isolate selected user's cross-domain transaction history
-    user_history_df = df[df["user_id"] == selected_user_id]
+    id_in = st.selectbox("Link Actual Amazon User ID", options=user_id_pool)
+    st.markdown("---")
     
-    st.sidebar.markdown("### Transaction Footprint")
-    st.sidebar.metric("Historical Review Count", len(user_history_df))
-    
-    # Collapsible viewport to inspect raw context constraints
-    with st.sidebar.expander(" View Profile History Logs", expanded=False):
-        st.dataframe(
-            user_history_df[["domain_category", "rating", "product_title"]],
-            hide_index=True
-        )
-
-    # 4. Task Modular Layout Tabs
-    tab1, tab2 = st.tabs([
-        " Task A: Deep User Modeling & Simulation", 
-        " Task B: Reason-Before-Recommend Loop"
-    ])
-
-    
-    # WORKSPACE FOR TASK A: USER MODELING
-    
-    with tab1:
-        st.header("Simulate Star Ratings and Written Reviews")
-        st.info("Simulates an explicit behavioral critique for an unseen product by enforcing strict persona constraints.")
+    # 👤 USER METADATA IDENTIFICATION UPDATE
+    if id_in != "None":
+        profile_data = user_registry[id_in]
+        st.info(f"📊 **Actual Dataset Identity Connected**\n"
+                f"- User Key Reference: `{id_in[:10]}...`\n"
+                f"- Past Reviews Traced: **{profile_data['total_historical_reviews_count']}**")
+        st.success(f"🧠 **AI-Extracted Behavior Persona:**\n*{profile_data['extracted_behavioral_persona']}*")
         
-        col1, col2 = st.columns([1, 1], gap="large")
+        # FIX: Extract the actual identity metrics from the look up registry cache dynamically
+        name_in = st.text_input("Name Wrapper", value=profile_data.get("name", f"User_{id_in[:4]}"), disabled=True)
+        age_in = st.number_input("Age Window", value=int(profile_data.get("age", 25)), disabled=True)
+        interests_in = profile_data["preferred_domains"]
+        st.caption("🔒 *Inputs locked to historical trace constants.*")
+    else:
+        st.subheader("🛠️ Create Custom Profile")
+        st.caption("🔓 *Sandbox Mode Active. Context Inference Layer will deduce environmental parameters.*")
+        name_in = st.text_input("Profile Name", "David Omoyola")
+        age_in = st.number_input("Biological Age", min_value=12, max_value=90, value=21)
+        interests_in = st.multiselect("Explicit Declared Interests", 
+                                      options=["Movies", "Electronics", "Books", "Software"],
+                                      default=["Electronics", "Books", "Movies"])
+
+    # Package clean arguments without manual entries
+    active_user_context = UserContextInput(
+        name=name_in,
+        age=int(age_in),
+        selected_id=id_in,
+        interests=interests_in,
+        demographic_profile="Inferred",
+        infrastructure_context="Inferred"
+    )
+
+tabs = st.tabs(["📝 Task A: Review Simulation Sandbox", "🏆 Task B: Multi-Agent Recommendation Track"])
+
+# ==========================================
+# TAB 1: RUNNING DIRECT SIMULATION TASK A
+# ==========================================
+with tabs[0]:
+    st.subheader("Dual-Head Structural Review Simulation Engine")
+    col_left, col_right = st.columns([1, 1])
+    
+    with col_left:
+        st.markdown("### Configure Input Space")
+        target_cat = st.selectbox("Target Product Category", ["Movies", "Electronics", "Books"])
         
-        with col1:
-            st.subheader("Target Item Parameters")
-            item_category = st.selectbox("Product Category:", ["Electronics", "Books"])
-            item_title = st.text_input(
-                "Product Title / Specification:", 
-                value="Heavy Duty Anti-Surge Multi-Plug Extension Box with Type-C Ports"
+        # Gather unique product items directly from our local dataset tracking file
+        available_titles = []
+        if os.path.exists(STAGING_PATH):
+            try:
+                df_load = pd.read_json(STAGING_PATH)
+                cat_match = df_load[df_load["domain_category"].str.lower() == target_cat.lower()]
+                if not cat_match.empty:
+                    available_titles = sorted(cat_match["product_title"].dropna().unique().tolist())
+            except Exception:
+                pass
+                
+        if not available_titles:
+            available_titles = [f"Sample Premium {target_cat} Choice Option Asset"]
+
+        # 🛒 DATASET FIX: Product titles are selected via an explicit dropdown selection box
+        selected_title = st.selectbox("Select Product / Movie From Dataset", options=available_titles)
+        
+        # Automatically pull technical metadata context records when a user shifts selections
+        default_specs = ""
+        if os.path.exists(STAGING_PATH) and selected_title:
+            try:
+                df_load = pd.read_json(STAGING_PATH)
+                matched_row = df_load[df_load["product_title"] == selected_title].iloc[0]
+                default_specs = f"ASIN Reference: {matched_row.get('item_id')}. Metadata footprint traces: {matched_row.get('review_text', '')[:250]}"
+            except Exception:
+                default_specs = "Standard baseline item parameters configuration."
+
+        with st.form("sim_form_v4"):
+            # 💡 DISCRETION FIX: Specifications remain completely free and open for manual user adjustments
+            prod_specs = st.text_area("Technical Specifications / Movie Metadata Plot-lines", value=default_specs, height=120)
+            add_details = st.text_input("Additional Scenario Details (Optional)", "")
+            submit_sim = st.form_submit_button("Launch Simulation Execution")
+
+    with col_right:
+        st.markdown("### Direct Process Outputs")
+        if submit_sim:
+            payload = ReviewGenerationRequest(
+                user_context=active_user_context,
+                product_category=target_cat,
+                product_title=selected_title,
+                product_specifications=prod_specs,
+                additional_details=add_details
             )
-            item_context = st.text_area(
-                "Additional Product Spec Details:", 
-                value="Thick 3-meter copper cable, high thermal resilience, built-in safety fuse circuit breaker."
-            )
-            
-            run_sim = st.button(" Execute Simulation Agent", use_container_width=True)
-            
-        with col2:
-            st.subheader("Agent Execution Feed")
-            if run_sim:
-                with st.spinner("Calibrating rating scale and generating localized voice..."):
-                    try:
-                        # Direct execution call to David's verified Dual-Head script
-                        sim_res = run_dual_head_simulation(
-                            user_id=selected_user_id,
-                            product_title=item_title,
-                            category=item_category,
-                            additional_context=item_context
-                        )
-                        
-                        # Visually separate analytical metrics from creative text outputs
-                        st.metric(label="Predicted Numerical Rating", value=f"{sim_res.predicted_rating} / 5.0")
-                        
-                        st.markdown("####  Critic Rating Justification")
-                        st.write(sim_res.critic_reasoning)
-                        
-                        st.markdown("#### 🇳🇬 Generated Localized Text Review")
-                        st.chat_message("user").write(sim_res.generated_review)
-                        
-                        with st.expander(" View Cultural Alignment Diagnostics"):
-                            st.write(sim_res.cultural_notes)
+            with st.spinner("Processing zero-shot cognitive calculations..."):
+                try:
+                    response = run_dynamic_user_simulation(payload)
+                    st.metric("Predicted Grading Value", f"⭐ {response.predicted_rating} / 5.0")
+                    st.info(f"**Critic Structural Justification:**\n{response.critic_reasoning}")
+                    st.success(f"**Generated First-Person Review Text:**\n\n\"{response.generated_review}\"")
+                    st.warning(f"**Age-Localized Cultural Notes:**\n{response.cultural_notes}")
+                    
+                    if id_in == "None":
+                        with st.expander("🔍 View AI Internal Context Inference Diagnostics", expanded=True):
+                            st.markdown(f"**🤖 Assumed Demographic Cohort:** {response.inferred_demographic}")
+                            st.markdown(f"**⚡ Assumed Infrastructure Realities:** {response.inferred_infrastructure}")
                             
-                    except Exception as e:
-                        st.error(f"Execution Error: {e}")
-            else:
-                st.caption("Awaiting parameters. Click 'Execute Simulation Agent' to trigger the cognitive engine.")
+                except Exception as err:
+                    st.error(f"Execution Error processing local parameters: {err}")
 
+# ==========================================
+# TAB 2: RUNNING DIRECT ARCHITECTURE TASK B
+# ==========================================
+with tabs[1]:
+    st.subheader("Cross-Domain Reason-Before-Recommend Panel")
     
-    # WORKSPACE FOR TASK B: INTELLIGENT RECOMMENDATION
-    
-    with tab2:
-        st.header("Context-Sensitive Cross-Domain Recommendation")
-        st.info("Triggers a ReAct sequence to form hypotheses and query cross-domain candidates before suggesting final items.")
-        
-        col3, col4 = st.columns([1, 1], gap="large")
-        
-        with col3:
-            st.subheader("Real-Time Context Input")
-            rec_category = st.selectbox("Target Category for Recommendations:", ["Electronics", "Books"])
-            context_signal = st.text_area(
-                "Live User Situation / Signal:", 
-                value="User is scaling up a remote coding workstation in Lagos and needs to protect high-end tech from severe grid fluctuations."
-            )
-            
-            run_rec = st.button(" Generate Smart Recommendations", use_container_width=True)
-            
-        with col4:
-            st.subheader("Agent Cognitive Output")
-            if run_rec:
-                with st.spinner("Analyzing profile patterns and testing candidate shelf space..."):
-                    try:
-                        # Direct execution call to David's verified ReAct recommender
-                        rec_res = run_multi_agent_recommender(
-                            user_id=selected_user_id,
-                            context_signal=context_signal,
-                            target_category=rec_category
-                        )
+    with st.form("rec_form_v4"):
+        rec_category = st.selectbox("Target Recommendation Track", ["Movies", "Electronics", "Books"])
+        spec_context = st.text_area("Current Browsing Focus Specification Signal", 
+                                    value=f"Looking for choices matching premium utility, tailored specifically to my declared {rec_category} expectations.")
+        submit_rec = st.form_submit_button("Convene Parallelized Arbitration Panel")
+
+    if submit_rec:
+        payload = RecommendationRequest(
+            user_context=active_user_context,
+            target_category=rec_category,
+            browsing_spec_context=spec_context
+        )
+        with st.spinner("Convening technical micro-agent debate panels..."):
+            try:
+                response = run_dynamic_multi_agent_recommender(payload)
+                
+                with st.expander("🤖 View Micro-Agent Internal Debate Transcript Logs", expanded=True):
+                    st.markdown(f"**🧱 Agent A (Infrastructure Realist):**\n{response.infrastructure_realist_critique}")
+                    st.markdown("---")
+                    st.markdown(f"**🦅 Agent B (Value/Budget Hawk):**\n{response.value_budget_hawk_critique}")
+                    st.markdown("---")
+                    st.markdown(f"**⚡ Agent C (Technical / Narrative Visionary):**\n{response.technical_visionary_critique}")
+                
+                st.info(f"⚖️ **Master Arbitrator Synthesis Resolution Summary:**\n{response.arbitrator_synthesis}")
+                
+                # Open src/app.py and locate the Tab 2 output rendering loop block. 
+# Replace the old loop with this clean, adaptive version:
+
+                st.subheader("🏆 Curated Selections")
+                for idx, item in enumerate(response.recommendations, 1):
+                    with st.container():
+                        # Read the product image link straight from the dataset item variables
+                        img_link = item.image_url.strip() if (hasattr(item, 'image_url') and item.image_url) else ""
                         
-                        st.markdown("####  Agent Internal Thought Process")
-                        st.info(rec_res.thought_process)
-                        
-                        st.markdown("####  Selected Filtering Heuristic")
-                        st.warning(rec_res.selected_action)
-                        
-                        st.markdown("#### 🇳🇬 Curated Top Recommendations")
-                        for idx, item in enumerate(rec_res.recommendations, 1):
-                            with st.container():
-                                st.markdown(f"**{idx}. {item.product_title}**")
-                                st.caption(f"Category: {item.category} | Product ID: {item.item_id}")
-                                st.write(f"*{item.curation_justification}*")
-                                st.markdown("---")
-                                
-                    except Exception as e:
-                        st.error(f"Recommendation Error: {e}")
-            else:
-                st.caption("Awaiting live signals. Click 'Generate Smart Recommendations' to watch the agent reason.")
+                        if img_link and img_link.startswith("http"):
+                            # 🖼️ Case A: An authentic image exists. Render using the 1:4 side-by-side grid.
+                            col_img, col_txt = st.columns([1, 4])
+                            with col_img:
+                                st.image(img_link, use_container_width=True)
+                            with col_txt:
+                                st.markdown(f"### {idx}. {item.product_title}")
+                                st.caption(f"ASIN: {item.item_id} | Segment Catalog: {item.category}")
+                                st.markdown(f"👉 *Curation Rationale:* {item.curation_justification}")
+                        else:
+                            # 🚫 Case B: Image is missing. Render text elements across the full width of the screen.
+                            st.markdown(f"### {idx}. {item.product_title}")
+                            st.caption(f"ASIN: {item.item_id} | Segment Catalog: {item.category}")
+                            st.markdown(f"👉 *Curation Rationale:* {item.curation_justification}")
+                            
+                    st.markdown("---")
+            except Exception as err:
+                st.error(f"Execution error processing arbitration matrices: {err}")
