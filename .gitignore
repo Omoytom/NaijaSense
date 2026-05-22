@@ -7,7 +7,7 @@ __pycache__/
 *.pyc
 
 # Local Data Cache (Optional, but stops GitHub bloat)
-data/staging_dataset.json
+
 .streamlit/
 .DS_Store
 
