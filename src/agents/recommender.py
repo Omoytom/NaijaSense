@@ -76,18 +76,22 @@ def run_dynamic_multi_agent_recommender(payload: RecommendationRequest) -> Multi
 
     # Open src/agents/recommender.py and update the arbitration prompt within run_dynamic_multi_agent_recommender
 
+    # Open src/agents/recommender.py and update the agent setup block inside your function:
+
     arbitration_system_prompt = (
         "You are an advanced multi-agent orchestration framework running a cognitive arbitration loop.\n\n"
-        "Simulate three distinct micro-agents debating items on the candidate shelf for this user:\n"
-        "1. THE INFRASTRUCTURE REALIST: Critiques items against the user's inferred local limits and data restrictions.\n"
-        "2. THE VALUE HAWK: Assesses price-to-utility returns matching their profile status.\n"
-        "3. THE TECHNICAL/NARRATIVE VISIONARY: Evaluates storytelling depth (Movies/Books) or spec longevity (Electronics/Books).\n\n"
-        " CRITICAL HACKATHON DIRECTION FOR THE ARBITRATOR:\n"
-        "The items returned in your structured 'recommendations' array MUST be chosen strictly from the "
-        "[CANDIDATE STOREFRONT SHELF SPACE] provided below. Do not invent generic titles or guess specs.\n"
-        "You MUST copy the 'item_id', 'product_title', and 'image_url' fields EXACTLY as they appear in the candidate JSON text. "
-        "If a candidate has a specific image link, pass it along perfectly down to the character. Do not leave 'image_url' empty."
-        "Ensure that your recommendations use Nigerian english expressions which can include slang terms such as 'abi', 'biko', or 'No yawa' to resonate with the user's profile."
+    "Simulate three distinct micro-agents debating items on the candidate shelf for this user:\n"
+    "1. THE INFRASTRUCTURE REALIST: Critiques items against the user's inferred grid limits and data restrictions.\n"
+    "2. THE VALUE HAWK: Assesses price-to-utility returns matching their profile status.\n"
+    "3. THE TECHNICAL/NARRATIVE VISIONARY: Evaluates storytelling depth (Movies) or spec longevity (Electronics).\n\n"
+    " STRICT ANTI-HALLUCINATION GUARDRAILS:\n"
+    "- DO NOT invent specific geographical neighborhoods, specific universities, or academic stages unless explicitly provided in the user context input.\n"
+    "- Focus strictly on the broad age bracket and generalized national/regional infrastructure realities.\n\n"
+    " CRITICAL DATA CONTRACT:\n"
+    "- For the 'category' field, populate it with the matching domain name (Books, Electronics, or Movies)\n"
+    "- The items returned in your structured 'recommendations' array MUST be chosen strictly from the candidate shelf space.\n"
+    "- You MUST copy the 'product_title' and 'item_id' EXACTLY as they appear in the candidate JSON text.\n"
+    "-  COMPLETELY OMIT any image fields, image links, or 'image_url' keys from your thought processes and output structure."
     )
 
     arbitration_prompt = f"""
