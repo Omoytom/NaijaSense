@@ -1,0 +1,36 @@
+{
+    "summary_metrics": {
+        "total_profiles_evaluated": 3,
+        "calculated_rmse": 1.8257418583505538,
+        "calculated_rouge_l_percentage": 12.743836124961994
+    },
+    "detailed_traces": [
+        {
+            "item_id": "1446304000",
+            "domain": "Books",
+            "ground_truth_rating": 5.0,
+            "predicted_rating": 4.0,
+            "rating_error": 1.0,
+            "rouge_l_score": 0.07142857142857144,
+            "generated_review_sample": "Omo, this book is a whole vibe! I wanted to start crocheting some cute soft toys and Edward's Menage..."
+        },
+        {
+            "item_id": "0811849783",
+            "domain": "Books",
+            "ground_truth_rating": 5.0,
+            "predicted_rating": 5.0,
+            "rating_error": 0.0,
+            "rouge_l_score": 0.14173228346456693,
+            "generated_review_sample": "Omo, this 'The Art of Instruction' postcard box is a complete vibe, no cap! I bought it to aesthetic..."
+        },
+        {
+            "item_id": "B071G974CD",
+            "domain": "Movies",
+            "ground_truth_rating": 2.0,
+            "predicted_rating": 5.0,
+            "rating_error": -3.0,
+            "rouge_l_score": 0.16915422885572143,
+            "generated_review_sample": "Oga o! After all the subpar movies I have been forced to endure lately, this 'Show Much Better Cinem..."
+        }
+    ]
+}

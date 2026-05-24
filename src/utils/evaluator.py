@@ -2,17 +2,24 @@ import os
 import math
 import time
 import random
+import json
 import pandas as pd
 from rouge_score import rouge_scorer
-from src.core.schemas import ReviewGenerationRequest, UserContextInput
+
+try:
+    from src.core.schemas import ReviewGenerationRequest, UserContextInput
+except ImportError:
+    from src.core.schemas import ReviewGenerationRequest, UserContextInput
+
 from src.agents.user_modelling import run_dynamic_user_simulation
 
 STAGING_PATH = "data/staging_dataset.json"
+REPORT_PATH = "data/evaluation_report.json"
 
 def run_evaluation_suite(sample_size: int = 3):
     """
     Automated pipeline testing accuracy metrics across historical interaction rows
-    using the updated hybrid context parameters.
+    using the updated hybrid context parameters. Outputs an engineering report file.
     """
     if not os.path.exists(STAGING_PATH):
         print(f" Verification Asset Not Found at '{STAGING_PATH}'. Run data loader first.")
@@ -26,17 +33,19 @@ def run_evaluation_suite(sample_size: int = 3):
     
     squared_errors = []
     rouge_l_scores = []
+    trace_logs = []
     scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
     
-    print(f" Launching verification sweep across {len(sampled_records)} diverse historical records...")
-    print("--------------------------------------------------")
+    print(f"📡 Launching verification sweep across {len(sampled_records)} diverse historical records...")
+    print("-" * 60)
     
     for idx, (_, row) in enumerate(sampled_records.iterrows()):
         current_domain = row.get("domain_category", "Electronics")
         true_rating = float(row.get("rating", 5.0))
-        true_text = row.get("review_text", "")
+        true_text = str(row.get("review_text", ""))
+        item_id = str(row.get("item_id", "Unknown"))
         
-        #  HYBRID ADAPTATION: Map historical row metrics into the new UserContextInput configuration
+        #  HYBRID ADAPTATION: Map historical row metrics into the unified UserContextInput configuration
         mock_context = UserContextInput(
             name=f"Historical Tester #{idx+1}",
             # Synthesize age traits to test grading robustness across generational models
@@ -52,49 +61,79 @@ def run_evaluation_suite(sample_size: int = 3):
             user_context=mock_context,
             product_category=current_domain,
             product_title=row.get("product_title", "Unknown Target Item"),
-            product_specifications=f"Historical Product Specifications ID Reference Code: {row.get('item_id')}.",
+            product_specifications=f"Historical Product Specifications ID Reference Code: {item_id}.",
             additional_details=f"Ground-truth benchmarking pass for domain: {current_domain}"
         )
         
         try:
             print(f" Processing Trace Profile {idx+1}/{len(sampled_records)} | Domain: [{current_domain}]")
             
-            # Execute the core engine pass
+            # Execute the core simulation engine pass
             simulation_output = run_dynamic_user_simulation(request_payload)
             
             # 1. Compute Rating Deviation Variance
-            error = true_rating - simulation_output.predicted_rating
+            predicted_rating = float(simulation_output.predicted_rating)
+            error = true_rating - predicted_rating
             squared_errors.append(error ** 2)
             
             # 2. Compute String N-Gram Overlap Variance
             scores = scorer.score(true_text, simulation_output.generated_review)
-            rouge_l_scores.append(scores['rougeL'].fmeasure)
+            current_rouge = scores['rougeL'].fmeasure
+            rouge_l_scores.append(current_rouge)
+            
+            # Cache the evaluation trace for report deep dives
+            trace_logs.append({
+                "item_id": item_id,
+                "domain": current_domain,
+                "ground_truth_rating": true_rating,
+                "predicted_rating": predicted_rating,
+                "rating_error": error,
+                "rouge_l_score": current_rouge,
+                "generated_review_sample": simulation_output.generated_review[:100] + "..."
+            })
             
             #  Safety throttle gap to ensure we stay under the free tier 15 RPM limits
             if idx < len(sampled_records) - 1:
-                print(" Pacing interval active. Holding for 4 seconds...")
+                print(" Pacing interval active. Holding for 4 seconds to protect API thresholds...")
                 time.sleep(4)
                 
         except Exception as api_fault:
-            print(f" Skipping row due to execution fault: {api_fault}")
+            print(f" Skipping row index {idx} due to execution fault: {api_fault}")
             continue
 
-    
-    # EMIT METRICS PERFORMANCE REPORT
-    
+    # ==========================================
+    #  EMIT & EXPORT PERFORMANCE REPORT
+    # ==========================================
     if squared_errors:
         final_rmse = math.sqrt(sum(squared_errors) / len(squared_errors))
         final_rouge = (sum(rouge_l_scores) / len(rouge_l_scores)) * 100
         
-        print("\n" + "="*50)
+        print("\n" + "="*60)
         print(" DNPE HYBRID RE-ALIGNED EVALUATION SUMMARY")
-        print("="*50)
-        print(f" Total Profiles Checked:      {len(squared_errors)}")
+        print("="*60)
+        print(f" Total Profiles Checked:        {len(squared_errors)}")
         print(f" Rating Precision Score (RMSE): {final_rmse:.4f}  (Lower is better)")
         print(f" Linguistic Overlap (ROUGE-L):  {final_rouge:.2f}% (Metric benchmark marker)")
-        print("="*50)
+        print("="*60)
+        
+        # Save results directly to disk to anchor your paper's experimental metrics
+        report_data = {
+            "summary_metrics": {
+                "total_profiles_evaluated": len(squared_errors),
+                "calculated_rmse": final_rmse,
+                "calculated_rouge_l_percentage": final_rouge
+            },
+            "detailed_traces": trace_logs
+        }
+        
+        os.makedirs("data", exist_ok=True)
+        with open(REPORT_PATH, "w") as f:
+            json.dump(report_data, f, indent=4)
+        print(f" Verification metrics logged successfully at: '{REPORT_PATH}'")
+        
     else:
         print(" No successful evaluations were processed.")
 
 if __name__ == "__main__":
+    # Feel free to turn this sample size up to 10 or 15 once your code goes live on Render!
     run_evaluation_suite(sample_size=3)
